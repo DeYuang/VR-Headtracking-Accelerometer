@@ -5,33 +5,41 @@ public class cameraRotation : MonoBehaviour {
 
 	private	Vector3		spawnPosition 		= Vector3.zero;
 	private	Vector3		upVector			= Vector3.zero;
-	public	float		neckLength			= 0.2f;
+	public	float		neckLength			= 1.5f;
 
 	void Start(){
 
 		spawnPosition = new Vector3(transform.position.x, transform.position.y - neckLength, transform.position.z);
-		upVector = new Vector3 (0f, neckLength, 0f);
+		upVector = new Vector3 (0.0f, neckLength, 0.0f);
 	}
 
 	void Update () {
 
-		if(AccelerometerTest.trackingModeInternal == TrackingMode.gyroscope)
+		TrackingMode trackingMode = AccelerometerTest.trackingModeInternal;
+
+		if(trackingMode == TrackingMode.None)
+			return;
+
+		if(trackingMode == TrackingMode.gyroscope)
 			transform.eulerAngles = AccelerometerTest.downVector;
 		else{
-			if(AccelerometerTest.trackingModeInternal == TrackingMode.DualAccelerometer){
+			Vector3 rotation = Vector3.zero;
+			if(trackingMode == TrackingMode.DualAccelerometer){
 				if(AccelerometerTest.faceUp)
-					transform.eulerAngles = AccelerometerTest.downVector;
+					rotation = AccelerometerTest.downVector;
 				else
-					transform.eulerAngles = AccelerometerTest.upVector;
+					rotation = AccelerometerTest.upVector;
 
 			}
-			else if(AccelerometerTest.trackingModeInternal == TrackingMode.TrippleAccelerometer)
-				transform.eulerAngles = AccelerometerTest.downVector;
+			else if(trackingMode == TrackingMode.TrippleAccelerometer)
+				rotation = AccelerometerTest.downVector;
 
 			if(AccelerometerTest.useCompass && stats.hasCompass)
-				transform.eulerAngles += Vector3.up * Input.compass.trueHeading;
+				rotation += Vector3.up * Input.compass.trueHeading;
 
-			transform.eulerAngles += new Vector3(0f, AccelerometerTest.jerkVector, 0f);
+			rotation += new Vector3(0.0f, AccelerometerTest.jerkVector, 0.0f);
+
+			transform.eulerAngles = rotation;
 		}
 
 		transform.position = spawnPosition + (transform.rotation * upVector);

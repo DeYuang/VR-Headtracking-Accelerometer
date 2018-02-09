@@ -32,16 +32,16 @@ public class AccelerometerTest : MonoBehaviour {
 
 	static public	bool			useCompass					= true;
 
-	void Awake () {
+	private void Awake () {
 	
 		acceleroRaw = new Vector3(Input.acceleration.x, Input.acceleration.y, Input.acceleration.z);
-		acceleroCurr = new Vector3(Mathf.Clamp(acceleroRaw.x, -1f, 1f), Mathf.Clamp(acceleroRaw.y, -1f, 1f), Mathf.Clamp(acceleroRaw.z, -1f, 1f));
+		acceleroCurr = new Vector3(Mathf.Clamp(acceleroRaw.x, -1.0f, 1.0f), Mathf.Clamp(acceleroRaw.y, -1.0f, 1.0f), Mathf.Clamp(acceleroRaw.z, -1.0f, 1.0f));
 		acceleroLast = acceleroCurr;
 		acceleroSecondLast = acceleroCurr;
 		acceleroTemporalAverage = acceleroRaw;
 	}
 
-	void Update(){
+	private void Update(){
 
 		// push down old readings
 		acceleroSecondLast = acceleroLast;
@@ -50,7 +50,7 @@ public class AccelerometerTest : MonoBehaviour {
 		acceleroRaw = Input.acceleration;
 
 		// Update Temporal Average
-		acceleroTemporalAverage = (acceleroTemporalAverage + acceleroRaw) / 2f;
+		acceleroTemporalAverage = (acceleroTemporalAverage + acceleroRaw) * 0.5f;
 
 		/*////////////////////////*/
 		///	Autoselect best mode ///
@@ -60,13 +60,16 @@ public class AccelerometerTest : MonoBehaviour {
 			if(SystemInfo.supportsGyroscope)
 				trackingModeInternal = TrackingMode.gyroscope;
 			else{
-				if(acceleroRaw.z != acceleroTemporalAverage.z && acceleroRaw.z != acceleroSecondLast.z)
+				if (acceleroRaw.z != acceleroTemporalAverage.z || acceleroRaw.z != acceleroSecondLast.z)
 					trackingModeInternal = TrackingMode.TrippleAccelerometer;
-				else
+				else if ((acceleroRaw.x != acceleroTemporalAverage.x || acceleroRaw.x != acceleroSecondLast.x) &&
+				      (acceleroRaw.y != acceleroTemporalAverage.y || acceleroRaw.y != acceleroSecondLast.y))
 					trackingModeInternal = TrackingMode.DualAccelerometer;
+				else
+					trackingModeInternal = TrackingMode.None;
 
-				//if(Input.gyro.enabled)
-				//	Input.gyro.enabled = false;
+				if(Input.gyro.enabled)
+					Input.gyro.enabled = false;
 			}
 		}
 		else
@@ -78,7 +81,7 @@ public class AccelerometerTest : MonoBehaviour {
 
 		// zero the z axis if there is no third accelerometer axis
 		if(trackingModeInternal == TrackingMode.DualAccelerometer)
-			acceleroCurr = new Vector3(acceleroRaw.x, acceleroRaw.y, 0f);
+			acceleroCurr = new Vector3(acceleroRaw.x, acceleroRaw.y, 0.0f);
 		else
 			acceleroCurr = acceleroRaw;
 
@@ -92,12 +95,18 @@ public class AccelerometerTest : MonoBehaviour {
 		// therefore 1 - accelerometer is the magnitude of the acceleration
 		// TODO: can we use this to calculate what the third accelerometer axis should be when we only have 2?
 
-		float accelerationMagnitude = Mathf.Abs (acceleroCurr.magnitude) - 1f;
-		if(accelerationMagnitude > 0f){
-			if(trackingModeInternal == TrackingMode.DualAccelerometer)
-				acceleroCurr -= new Vector3(accelerationMagnitude/2f, accelerationMagnitude/2f, 0f);
-			else
-				acceleroCurr -= new Vector3(accelerationMagnitude/3f, accelerationMagnitude/3f, accelerationMagnitude/3f);
+		float accelerationMagnitude = Mathf.Abs (acceleroCurr.magnitude) - 1.0f;
+		if(accelerationMagnitude > 0.0f){
+			if(trackingModeInternal == TrackingMode.DualAccelerometer){
+				float halfMagnitune = accelerationMagnitude * 0.5f;
+				acceleroCurr -= new Vector3(halfMagnitune, halfMagnitune, 0.0f);
+
+			}
+			else{
+				float thirdMagnitude = accelerationMagnitude / 3.0f;
+				acceleroCurr -= new Vector3(thirdMagnitude, thirdMagnitude, thirdMagnitude);
+
+			}
 		}
 		// this removes acceleration evenly but it's not all that fair
 		// we should find any axis that's over 1 and removes from there first
@@ -111,25 +120,25 @@ public class AccelerometerTest : MonoBehaviour {
 				acceleroCurr.z = 0f;*/
 
 		// better headbob jerk filter
-		/*if(Mathf.Abs(Mathf.Abs (acceleroCurr.x) -
-		             (Mathf.Abs(acceleroLast.x) + Mathf.Abs(acceleroSecondLast.x)) / 2f) > 0.1f)
+		if(Mathf.Abs(Mathf.Abs (acceleroCurr.x) -
+		             (Mathf.Abs(acceleroLast.x) + Mathf.Abs(acceleroSecondLast.x)) * 0.5f) > 0.1f)
 			acceleroCurr.x = (acceleroSecondLast.x - acceleroLast.x + acceleroSecondLast.x);
 		else if(Mathf.Abs(acceleroRaw.x) > 1.25f)
-				acceleroCurr.x = 0f;
+				acceleroCurr.x = 0.0f;
 
 		if(Mathf.Abs(Mathf.Abs (acceleroCurr.y) -
-		             (Mathf.Abs(acceleroLast.y) + Mathf.Abs(acceleroSecondLast.y)) / 2f) > 0.1f)
+		             (Mathf.Abs(acceleroLast.y) + Mathf.Abs(acceleroSecondLast.y)) * 0.5f) > 0.1f)
 			acceleroCurr.y = (acceleroSecondLast.y - acceleroLast.y + acceleroSecondLast.y);
 		else if(Mathf.Abs(acceleroRaw.y) > 1.25f)
-				acceleroCurr.y = 0f;
+				acceleroCurr.y = 0.0f;
 
-		if(trackingModeInternal == TrackingMode.trippleAccelerometer){
+		if(trackingModeInternal == TrackingMode.TrippleAccelerometer){
 			if(Mathf.Abs(Mathf.Abs (acceleroCurr.z) -
-			             (Mathf.Abs(acceleroLast.z) + Mathf.Abs(acceleroSecondLast.z)) / 2f) > 0.1f)
+			             (Mathf.Abs(acceleroLast.z) + Mathf.Abs(acceleroSecondLast.z)) * 0.5f) > 0.1f)
 				acceleroCurr.z = (acceleroSecondLast.z - acceleroLast.z + acceleroSecondLast.z);
 			else if(Mathf.Abs(acceleroRaw.z) > 1.25f)
-				acceleroCurr.z = 0f;
-		}*/
+				acceleroCurr.z = 0.0f;
+		}
 
 		// NOTE: this filters out the jerky movement when you put the headset down
 		// and autoswitches the down and up vectors
@@ -137,19 +146,16 @@ public class AccelerometerTest : MonoBehaviour {
 			if(Mathf.Abs (acceleroCurr.y) < 0.08f &&
 			   Mathf.Abs (acceleroCurr.x) < 0.08f){
 
-				acceleroRaw = new Vector3(0f, 0f, acceleroRaw.z);
+				acceleroRaw = new Vector3(0.0f, 0.0f, acceleroRaw.z);
 				acceleroCurr = Vector3.zero;
 				faceUp = true;
 
-				downVector = upVector = new Vector3(90f, 0f, 0f);
-				//upVector = new Vector3(270f, 0f, 0f);
+				downVector = upVector = new Vector3(90.0f, 0.0f, 0.0f);
 				return;
 			}
 			else{
 				if(Mathf.Abs (acceleroCurr.y) > 0.95f)
 					faceUp = false;
-			//	else if(Mathf.Abs (acceleroCurr.y) < 0.3f)
-			//		faceUp = true;
 			}
 		}
 
@@ -160,19 +166,19 @@ public class AccelerometerTest : MonoBehaviour {
 			acceleroCurr = Vector3.forward;
 			faceUp = true;
 
-			downVector = upVector = new Vector3(90f, 0f, 0f);
+			downVector = upVector = new Vector3(90.0f, 0.0f, 0.0f);
 			return;
 		}
 
 		// filter out any remaining peaks
-		acceleroCurr = new Vector3(Mathf.Clamp(acceleroCurr.x, -1f, 1f), Mathf.Clamp(acceleroCurr.y, -1f, 1f), Mathf.Clamp(acceleroCurr.z, -1f, 1f));
+		acceleroCurr = new Vector3(Mathf.Clamp(acceleroCurr.x, -1.0f, 1.0f), Mathf.Clamp(acceleroCurr.y, -1.0f, 1.0f), Mathf.Clamp(acceleroCurr.z, -1.0f, 1.0f));
 
 		/*///////////////////////////////*/
 		///	Accelerometer interpolation	///
 		/*///////////////////////////////*/
 
 		// interpolated readings
-		Vector3 interp = (acceleroSecondLast + acceleroCurr) / 2f; // -1 frames
+		Vector3 interp = (acceleroSecondLast + acceleroCurr) * 0.5f; // -1 frames
 
 		// extrapolated readings
 		Vector3 extrap1 = (acceleroLast - acceleroSecondLast) + acceleroLast; // +0 frames
@@ -183,16 +189,16 @@ public class AccelerometerTest : MonoBehaviour {
 		/*///////////////////////*/
 
 		// (+0 frames)+(-1 frames)+(+1 frames)= +0 frames
-		accelero = (acceleroCurr + acceleroLast + extrap2) / 3f;
+		accelero = (acceleroCurr + acceleroLast + extrap2) / 3.0f;
 
 		// (+0 frames)+(-1 frames)+(-2 frames) = -3 frames / 3 = -1 frames
-		acceleroSmooth = (acceleroCurr + acceleroLast + acceleroSecondLast) / 3f;
+		acceleroSmooth = (acceleroCurr + acceleroLast + acceleroSecondLast) / 3.0f;
 
 		// (+0 frames)+(-1 frames)+(-2 frames)+(+3 frames) = +0 frames
 		//acceleroSmooth = (acceleroCurr + acceleroLast + acceleroSecondLast + (extrap2*3f)) / 6f;
 
 		// (+0 frames)+(-1 frames)+(-2 frames)+(-1frames)+(+0 frames)+(+1 frames) = -3 frames / 6 = -0.5 frames
-		acceleroFiltered = (acceleroCurr + acceleroLast + acceleroSecondLast + interp + extrap1 + extrap2) / 6f;
+		acceleroFiltered = (acceleroCurr + acceleroLast + acceleroSecondLast + interp + extrap1 + extrap2) / 6.0f;
 
 		/*///////////////////////////*/
 		///	Downvector calculation	///
@@ -200,60 +206,56 @@ public class AccelerometerTest : MonoBehaviour {
 
 		if(trackingModeInternal == TrackingMode.DualAccelerometer){
 			// lower 90 degrees
-			downVector = new Vector3(90f - (verticalAccelerationCurve.Evaluate(Mathf.Abs(acceleroSmooth.magnitude)) * -90f), 
-			                         0f, 
-			                         (Mathf.Atan2(acceleroSmooth.x, acceleroSmooth.y) * Mathf.Rad2Deg) + 180f);
-
+			downVector = new Vector3(90.0f - (verticalAccelerationCurve.Evaluate(Mathf.Abs(acceleroSmooth.magnitude)) * -90.0f), 
+			                         0.0f, 
+			                         (Mathf.Atan2(acceleroSmooth.x, acceleroSmooth.y) * Mathf.Rad2Deg) + 180.0f);
 			// upper 90 degrees
-			upVector = new Vector3(-90f - (verticalAccelerationCurve.Evaluate(Mathf.Abs(acceleroSmooth.magnitude)) * -90f), 
-			                       0f, 
-			                       (Mathf.Atan2(acceleroSmooth.x, acceleroSmooth.y) * Mathf.Rad2Deg) + 180f);
-
-			//downVector = new Vector3(0f, 0f, Mathf.Atan2(extrap2.x, extrap2.y) * Mathf.Rad2Deg + 180f);
-			//upVector = downVector;
+			upVector = new Vector3(-90.0f - (verticalAccelerationCurve.Evaluate(Mathf.Abs(acceleroSmooth.magnitude)) * -90.0f), 
+			                       0.0f, 
+			                       (Mathf.Atan2(acceleroSmooth.x, acceleroSmooth.y) * Mathf.Rad2Deg) + 180.0f);
 		}
 		else if(trackingModeInternal == TrackingMode.TrippleAccelerometer){
 			// new style
-			downVector = new Vector3(Mathf.Atan2(acceleroSmooth.z, acceleroSmooth.y) * Mathf.Rad2Deg + 180f, 
-			                         0f, 
+			downVector = new Vector3(Mathf.Atan2(acceleroSmooth.z, acceleroSmooth.y) * Mathf.Rad2Deg + 180.0f, 
+			                         0.0f, 
 			                         -Mathf.Atan2(acceleroSmooth.x, Mathf.Sqrt(acceleroSmooth.y*acceleroSmooth.y + acceleroSmooth.z*acceleroSmooth.z)) * Mathf.Rad2Deg);
-
 			upVector = downVector;
 		}		
-		else if(trackingModeInternal == TrackingMode.gyroscope){
-			useCompass = false;
-			downVector = Input.gyro.attitude.eulerAngles;
-			upVector = downVector;
-		}
 		else{
 			useCompass = false;
-			downVector = Vector3.zero;
-			upVector = Vector3.zero;
+			if(trackingModeInternal == TrackingMode.gyroscope){
+				downVector = Input.gyro.attitude.eulerAngles;
+				upVector = downVector;
+			}
+			else{		
+				downVector = Vector3.zero;
+				upVector = Vector3.zero;
+			}
 		}
+		
 
 		/*///////////////////////////*/
 		///	Headset jerk detection	///
 		/*///////////////////////////*/
 
 		//compensate the rotation by detecting jerking motions
-
-		if(Mathf.Abs(acceleroRaw.magnitude) > 1f && Mathf.Abs (acceleroRaw.x) > Mathf.Abs (acceleroRaw.y)){
+		if(Mathf.Abs(acceleroRaw.magnitude) > 1.0f && Mathf.Abs (acceleroRaw.x) > Mathf.Abs (acceleroRaw.y)){
 			jerkVector = Mathf.Clamp(jerkVector + (acceleroRaw.x * jerkFactor), -jerkMax, jerkMax);
 		}
 		else
-			jerkVector = Mathf.Lerp(jerkVector, 0f, jerkFactor * Time.deltaTime);
+			jerkVector = Mathf.Lerp(jerkVector, 0.0f, jerkFactor * Time.deltaTime);
 
-		/*jerkVector = Mathf.Clamp(jerkVector + (acceleroRaw.x -((acceleroLast.x + acceleroSecondLast.x) / 2f) * jerkFactor), -jerkMax, jerkMax);
 
+		/*jerkVector = Mathf.Clamp(jerkVector + (acceleroRaw.x -((acceleroLast.x + acceleroSecondLast.x) * 0.5f) * jerkFactor), -jerkMax, jerkMax);
 		if(acceleroRaw.x -
-		   ((acceleroLast.x + acceleroSecondLast.x) / 2f) > 0.3f)
+		   ((acceleroLast.x + acceleroSecondLast.x) * 0.5f) > 0.3f)
 			jerkVector = Mathf.Clamp(jerkVector + (acceleroRaw.x - 0.3f) * jerkFactor, -jerkMax, jerkMax);
 
 		else if(acceleroRaw.x -
-		   ((acceleroLast.x + acceleroSecondLast.x) / 2f) < -0.3f)
+		   ((acceleroLast.x + acceleroSecondLast.x) * 0.5f) < -0.3f)
 			jerkVector = Mathf.Clamp(jerkVector + (acceleroRaw.x + 0.3f) * jerkFactor, -jerkMax, jerkMax);
 
 		else
-			jerkVector = Mathf.Lerp(jerkVector, 0f, jerkFactor * Time.deltaTime);*/
+			jerkVector = Mathf.Lerp(jerkVector, 0.0f, jerkFactor * Time.deltaTime);*/
 	}
 }
